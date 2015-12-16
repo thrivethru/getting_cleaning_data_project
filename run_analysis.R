@@ -7,7 +7,11 @@
 # 4. Appropriately labels the data set with descriptive variable names. 
 # 5. From the data set in step 4, creates a second, independent tidy data set
 #  	 with the average of each variable for each activity and each subject.
- 
+
+# Required libraries
+library(dplyr) 
+library(plyr)
+
 # File locations
 file_features <- "dataset/features.txt" # List of all features. 561, 2
 file_activity_labels <- "dataset/activity_labels.txt" # Links the class labels with their activity name. 6, 2
@@ -20,7 +24,7 @@ file_subject_test <- "dataset/test/subject_test.txt" # The subject who performed
 
 # Load data sets
 features <- read.table(file_features, colClasses = c("integer", "character"), header = FALSE)
-activity_labels <- read.table(file_activity_labels, header = FALSE)
+activity_labels <- read.table(file_activity_labels, colClasses = c("integer", "character"), header = FALSE)
 X_train <- read.table(file_X_train, header = FALSE)
 y_train <- read.table(file_y_train, header = FALSE)
 subject_train <- read.table(file_subject_train, header = FALSE)
@@ -37,15 +41,27 @@ merged_train_test <- rbind(train, test)
 sub_act <- c("Subject","Activity")
 feat <- features[,2]
 column_names <- c(sub_act, feat)
+column_names <- make.names(column_names, unique = TRUE, allow_ = TRUE)
 colnames(merged_train_test) <- column_names
 
 # Extract only the measurements on the mean and standard deviation for each measurement. 
-# grep mean|std
-data <- select(matches('m|ar')
-n <- names(select(merged_train_test, matches("mean|std"))
+mean_std <- grep("mean|std", names(merged_train_test), value=TRUE)
+columns_keep <- c(sub_act, mean_std)
+data <- select(merged_train_test, one_of(columns_keep))
 
 # Name the activities with descriptive names
+labels <- nrow(activity_labels)
+for(i in 1:labels) {
+	data$Activity[data$Activity == activity_labels[i,1]] <- activity_labels[i,2]
+}
+# Create a dataset with the average of each variable for each activity and each subject. mean_std, na.rm = TRUE
+tidy_data <- aggregate(data, by = list(data$Activity, data$Subject), FUN = mean, na.rm = TRUE)
+tidy_data$Activity <- NULL
+tidy_data$Subject <- NULL
+tidy_data <- rename(tidy_data, c("Group.1"="Activity", "Group.2"="Subject"))
 
-
-# Create a txt file with write.table() using row.name=FALSE
-
+# Create a txt file with write.table()
+write.table(tidy_data, file = "tidy_data.txt", append = FALSE, quote = TRUE, sep = " ",
+            eol = "\n", na = "NA", dec = ".", row.names = FALSE,
+            col.names = TRUE, qmethod = c("escape", "double"),
+            fileEncoding = "")
